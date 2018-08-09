@@ -13,7 +13,7 @@ import types
 import collections
 import warnings
 
-from . import functional as F
+from torchvision.transforms import functional as F
 
 __all__ = ["Compose", "ToTensor", "ToPILImage", "Normalize", "Resize", "Scale", "CenterCrop", "Pad",
            "Lambda", "RandomApply", "RandomChoice", "RandomOrder", "RandomCrop", "RandomHorizontalFlip",
@@ -44,10 +44,16 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, img):
-        for t in self.transforms:
-            img = t(img)
-        return img
+    def __call__(self, *imgs):
+        if len(imgs) == 1:
+            img = imgs[0]
+            for t in self.transforms:
+                img = t(img)
+            return img
+        else:
+            for t in self.transforms:
+                imgs = t(*imgs)
+            return imgs
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
@@ -65,7 +71,7 @@ class ToTensor(object):
     [0, 255] to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0].
     """
 
-    def __call__(self, pic):
+    def __call__(self, *pics):
         """
         Args:
             pic (PIL Image or numpy.ndarray): Image to be converted to tensor.
@@ -73,7 +79,11 @@ class ToTensor(object):
         Returns:
             Tensor: Converted image.
         """
-        return F.to_tensor(pic)
+        out = tuple(F.to_tensor(pic) for pic in pics)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -98,7 +108,7 @@ class ToPILImage(object):
     def __init__(self, mode=None):
         self.mode = mode
 
-    def __call__(self, pic):
+    def __call__(self, *pics):
         """
         Args:
             pic (Tensor or numpy.ndarray): Image to be converted to PIL Image.
@@ -107,7 +117,11 @@ class ToPILImage(object):
             PIL Image: Image converted to PIL Image.
 
         """
-        return F.to_pil_image(pic, self.mode)
+        out = tuple(F.to_pil_image(pic, self.mode) for pic in pics)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
@@ -164,7 +178,7 @@ class Resize(object):
         self.size = size
         self.interpolation = interpolation
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be scaled.
@@ -172,7 +186,11 @@ class Resize(object):
         Returns:
             PIL Image: Rescaled image.
         """
-        return F.resize(img, self.size, self.interpolation)
+        out = tuple(F.resize(img, self.size, self.interpolation) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -204,7 +222,7 @@ class CenterCrop(object):
         else:
             self.size = size
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be cropped.
@@ -212,7 +230,11 @@ class CenterCrop(object):
         Returns:
             PIL Image: Cropped image.
         """
-        return F.center_crop(img, self.size)
+        out = tuple(F.center_crop(img, self.size) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
@@ -400,7 +422,7 @@ class RandomCrop(object):
         j = random.randint(0, w - tw)
         return i, j, th, tw
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be cropped.
@@ -409,18 +431,21 @@ class RandomCrop(object):
             PIL Image: Cropped image.
         """
         if self.padding > 0:
-            img = F.pad(img, self.padding)
-
+            imgs = tuple(F.pad(img, self.padding) for img in imgs)
         # pad the width if needed
-        if self.pad_if_needed and img.size[0] < self.size[1]:
-            img = F.pad(img, (int((1 + self.size[1] - img.size[0]) / 2), 0))
+        if self.pad_if_needed:
+            imgs = tuple(F.pad(img, (int((1 + self.size[1] - img.size[0]) / 2), 0)) if img.size[0] < self.size[1] else img
+                         for img in imgs)
         # pad the height if needed
-        if self.pad_if_needed and img.size[1] < self.size[0]:
-            img = F.pad(img, (0, int((1 + self.size[0] - img.size[1]) / 2)))
-
-        i, j, h, w = self.get_params(img, self.size)
-
-        return F.crop(img, i, j, h, w)
+        if self.pad_if_needed:
+            imgs = tuple(F.pad(img, (0, int((1 + self.size[0] - img.size[1]) / 2))) if img.size[1] < self.size[0] else img
+                         for img in imgs)
+        i, j, h, w = self.get_params(imgs[0], self.size)
+        out = tuple(F.crop(img, i, j, h, w) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
@@ -436,7 +461,7 @@ class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be flipped.
@@ -445,8 +470,13 @@ class RandomHorizontalFlip(object):
             PIL Image: Randomly flipped image.
         """
         if random.random() < self.p:
-            return F.hflip(img)
-        return img
+            out = tuple(F.hflip(img) for img in imgs)
+        else:
+            out = imgs
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
@@ -462,7 +492,7 @@ class RandomVerticalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be flipped.
@@ -471,8 +501,13 @@ class RandomVerticalFlip(object):
             PIL Image: Randomly flipped image.
         """
         if random.random() < self.p:
-            return F.vflip(img)
-        return img
+            out = tuple(F.vflip(img) for img in imgs)
+        else:
+            out = imgs
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
@@ -534,7 +569,7 @@ class RandomResizedCrop(object):
         j = (img.size[0] - w) // 2
         return i, j, w, w
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be cropped and resized.
@@ -542,8 +577,12 @@ class RandomResizedCrop(object):
         Returns:
             PIL Image: Randomly cropped and resized image.
         """
-        i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        return F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
+        i, j, h, w = self.get_params(imgs[0], self.scale, self.ratio)
+        out = tuple(F.resized_crop(img, i, j, h, w, self.size, self.interpolation) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -743,7 +782,7 @@ class ColorJitter(object):
 
         return transform
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Input image.
@@ -753,7 +792,11 @@ class ColorJitter(object):
         """
         transform = self.get_params(self.brightness, self.contrast,
                                     self.saturation, self.hue)
-        return transform(img)
+        out = tuple(transform(img) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
@@ -809,17 +852,19 @@ class RandomRotation(object):
 
         return angle
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
             img (PIL Image): Image to be rotated.
 
         Returns:
             PIL Image: Rotated image.
         """
-
         angle = self.get_params(self.degrees)
-
-        return F.rotate(img, angle, self.resample, self.expand, self.center)
+        out = tuple(F.rotate(img, angle, self.resample, self.expand, self.center) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '(degrees={0}'.format(self.degrees)
@@ -967,7 +1012,7 @@ class Grayscale(object):
     def __init__(self, num_output_channels=1):
         self.num_output_channels = num_output_channels
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be converted to grayscale.
@@ -975,7 +1020,11 @@ class Grayscale(object):
         Returns:
             PIL Image: Randomly grayscaled image.
         """
-        return F.to_grayscale(img, num_output_channels=self.num_output_channels)
+        out = tuple(F.to_grayscale(img, num_output_channels=self.num_output_channels) for img in imgs)
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(num_output_channels={0})'.format(self.num_output_channels)
@@ -998,7 +1047,7 @@ class RandomGrayscale(object):
     def __init__(self, p=0.1):
         self.p = p
 
-    def __call__(self, img):
+    def __call__(self, *imgs):
         """
         Args:
             img (PIL Image): Image to be converted to grayscale.
@@ -1006,10 +1055,18 @@ class RandomGrayscale(object):
         Returns:
             PIL Image: Randomly grayscaled image.
         """
-        num_output_channels = 1 if img.mode == 'L' else 3
         if random.random() < self.p:
-            return F.to_grayscale(img, num_output_channels=num_output_channels)
-        return img
+            out = []
+            for img in imgs:
+                num_output_channels = 1 if img.mode == 'L' else 3
+                out.append(F.to_grayscale(img, num_output_channels=num_output_channels))
+            out = tuple(out)
+        else:
+            out = imgs
+        if len(out) == 1:
+            return out[0]
+        else:
+            return out
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
