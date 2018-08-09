@@ -11,7 +11,8 @@ First of all, thanks [torchvision_paired_transforms](https://github.com/agaldran
 1. Till now, these classes have been modified to accept multiple images as input
 ```
 Compose, ToTensor, ToPILImage, Resize, CenterCrop, 
-RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop, ColorJitter, RandomRotation, Grayscale, RandomGrayscale
+RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop, RandomRotation
+ColorJitter, Grayscale, RandomGrayscale
 ```
 
 ### How to use
@@ -68,7 +69,7 @@ RandomCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop, ColorJi
 ### Future
 1. If you find any bug, please tell me.
 1. If you know how to make the code seem more elegant, please tell me.
-1. If you modify the remain classes, please send me a push request.
+1. If you modify the remain classes, please send me a pull request.
 1. I hope the code can be matained until torchvision release joint transformation.
 
 
